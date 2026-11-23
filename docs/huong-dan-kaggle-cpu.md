@@ -48,13 +48,13 @@ Các ô dưới đây chạy lần lượt. `%%bash` là ô Bash; những ô cò
 ```python
 import os, pathlib, subprocess, json, time, urllib.request
 
-repo = pathlib.Path('/kaggle/working/BTL-KTPM')
+repo = pathlib.Path('/kaggle/working/SA_Phase2_Optimise')
 if not repo.exists():
-    subprocess.run(['git', 'clone', '--branch', 'dev',
-                    'https://github.com/Huy-hoc-it/BTL-KTPM.git', str(repo)], check=True)
+    subprocess.run(['git', 'clone', '--branch', 'main',
+                    'https://github.com/HUY-TD16/SA_Phase2_Optimise.git', str(repo)], check=True)
 os.chdir(repo)
 # Để tái lập đúng bản đã đối chiếu; đổi SHA nếu nhóm đã sửa và push phiên bản mới.
-subprocess.run(['git', 'checkout', '36c8922'], check=True)
+subprocess.run(['git', 'checkout', '0d329cc'], check=True)
 subprocess.run(['git', 'rev-parse', 'HEAD'], check=True)
 subprocess.run(['git', 'status', '--short'], check=True)
 ```
