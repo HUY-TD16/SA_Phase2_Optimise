@@ -6,4 +6,12 @@ target/
 load-test/fixtures.local.json
 load-test/results/*
 !load-test/results/.gitkeep
+load_test_v2/fixtures.local.json
+load_test_v2/results/*
+!load_test_v2/results/.gitkeep
+__pycache__/
+*.pyc
+
 .AI/
+.agent/
+
