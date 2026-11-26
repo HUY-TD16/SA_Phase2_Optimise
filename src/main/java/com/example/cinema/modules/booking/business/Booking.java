@@ -3,17 +3,21 @@ package com.example.cinema.modules.booking.business;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 public class Booking {
 
     private final UUID bookingId;
+    private final String bookingCode;
     private final UUID userId;
     private final UUID showtimeId;
     private final List<bookingSeat> seats;
     private final BigDecimal totalAmount;
     private final Instant createdAt;
     private final PaymentStatus paymentStatus;
+    private final BookingStatus status;
+    private final Instant cancelledAt;
 
     public Booking(
             UUID userId,
@@ -43,17 +47,58 @@ public class Booking {
             Instant createdAt,
             PaymentStatus paymentStatus
     ) {
+        this(
+                bookingId,
+                generateBookingCode(bookingId),
+                userId,
+                showtimeId,
+                seats,
+                totalAmount,
+                createdAt,
+                paymentStatus,
+                BookingStatus.CONFIRMED,
+                null
+        );
+    }
+
+    public Booking(
+            UUID bookingId,
+            String bookingCode,
+            UUID userId,
+            UUID showtimeId,
+            List<bookingSeat> seats,
+            BigDecimal totalAmount,
+            Instant createdAt,
+            PaymentStatus paymentStatus,
+            BookingStatus status,
+            Instant cancelledAt
+    ) {
         this.bookingId = bookingId;
+        this.bookingCode = (bookingCode == null || bookingCode.isBlank())
+                ? generateBookingCode(bookingId)
+                : bookingCode;
         this.userId = userId;
         this.showtimeId = showtimeId;
         this.seats = List.copyOf(seats);
         this.totalAmount = totalAmount;
         this.createdAt = createdAt;
         this.paymentStatus = paymentStatus;
+        this.status = status == null ? BookingStatus.CONFIRMED : status;
+        this.cancelledAt = cancelledAt;
+    }
+
+    private static String generateBookingCode(UUID id) {
+        UUID source = id != null ? id : UUID.randomUUID();
+        String compact = source.toString().replace("-", "").toUpperCase(Locale.ROOT);
+        return "BK-" + compact.substring(0, 12);
     }
 
     public UUID getBookingId() {
         return bookingId;
+    }
+
+    public String getBookingCode() {
+        return bookingCode;
     }
 
     public UUID getUserId() {
@@ -75,4 +120,8 @@ public class Booking {
     public Instant getCreatedAt() { return createdAt; }
 
     public PaymentStatus getPaymentStatus() { return paymentStatus; }
+
+    public BookingStatus getStatus() { return status; }
+
+    public Instant getCancelledAt() { return cancelledAt; }
 }

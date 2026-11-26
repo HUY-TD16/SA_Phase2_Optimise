@@ -2,6 +2,7 @@ package com.example.cinema.modules.booking.data;
 
 import com.example.cinema.modules.booking.business.Booking;
 import com.example.cinema.modules.booking.business.BookingRepository;
+import com.example.cinema.modules.booking.business.BookingStatus;
 import com.example.cinema.modules.booking.business.bookingSeat;
 import java.util.List;
 import java.util.Optional;
@@ -28,13 +29,24 @@ class BookingRepositoryAdapter implements BookingRepository {
     @Override
     public Booking save(Booking booking) {
         bookingJpaRepository.save(new BookingEntity(
-                booking.getBookingId(), booking.getUserId(), booking.getShowtimeId(),
-                booking.getTotalAmount(), booking.getCreatedAt(), booking.getPaymentStatus()));
+                booking.getBookingId(),
+                booking.getBookingCode(),
+                booking.getUserId(),
+                booking.getShowtimeId(),
+                booking.getTotalAmount(),
+                booking.getCreatedAt(),
+                booking.getPaymentStatus(),
+                booking.getStatus(),
+                booking.getCancelledAt()));
 
         List<BookingSeatEntity> seatEntities = booking.getSeats().stream()
                 .map(seat -> new BookingSeatEntity(
-                        UUID.randomUUID(), booking.getBookingId(), booking.getShowtimeId(),
-                        seat.getSeatId(), seat.getPrice()))
+                        UUID.randomUUID(),
+                        booking.getBookingId(),
+                        booking.getShowtimeId(),
+                        seat.getSeatId(),
+                        seat.getPrice(),
+                        seat.getReleasedAt()))
                 .toList();
         bookingSeatJpaRepository.saveAll(seatEntities);
         return booking;
@@ -59,7 +71,7 @@ class BookingRepositoryAdapter implements BookingRepository {
 
     @Override
     public boolean existsByShowtimeIdAndSeatId(UUID showtimeId, UUID seatId) {
-        return bookingSeatJpaRepository.existsByShowtimeIdAndSeatId(showtimeId, seatId);
+        return bookingSeatJpaRepository.existsByShowtimeIdAndSeatIdAndReleasedAtIsNull(showtimeId, seatId);
     }
 
     @Override
@@ -71,9 +83,7 @@ class BookingRepositoryAdapter implements BookingRepository {
 
     @Override
     public boolean existsConfirmedByShowtimeId(UUID showtimeId) {
-        // Every saved booking is confirmed immediately in current persistence.
-        // payment_status is independent of confirmation and does not release seats.
-        return bookingJpaRepository.existsByShowtimeId(showtimeId);
+        return bookingJpaRepository.existsByShowtimeIdAndStatus(showtimeId, BookingStatus.CONFIRMED);
     }
 
     @Override
@@ -83,9 +93,18 @@ class BookingRepositoryAdapter implements BookingRepository {
 
     private Booking toBooking(BookingEntity entity) {
         List<bookingSeat> seats = bookingSeatJpaRepository.findAllByBookingId(entity.getId()).stream()
-                .map(seat -> new bookingSeat(seat.getSeatId(), seat.getPrice()))
+                .map(seat -> new bookingSeat(seat.getSeatId(), seat.getPrice(), seat.getReleasedAt()))
                 .toList();
-        return new Booking(entity.getId(), entity.getUserId(), entity.getShowtimeId(), seats,
-                entity.getTotalAmount(), entity.getCreatedAt(), entity.getPaymentStatus());
+        return new Booking(
+                entity.getId(),
+                entity.getBookingCode(),
+                entity.getUserId(),
+                entity.getShowtimeId(),
+                seats,
+                entity.getTotalAmount(),
+                entity.getCreatedAt(),
+                entity.getPaymentStatus(),
+                entity.getStatus(),
+                entity.getCancelledAt());
     }
 }

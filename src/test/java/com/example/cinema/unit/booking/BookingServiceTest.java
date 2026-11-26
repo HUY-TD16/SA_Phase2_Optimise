@@ -3,6 +3,9 @@ package com.example.cinema.unit.booking;
 import com.example.cinema.modules.booking.business.Booking;
 import com.example.cinema.modules.booking.business.BookingNotFoundException;
 import com.example.cinema.modules.booking.business.BookingService;
+import com.example.cinema.modules.booking.business.BookingStatus;
+import com.example.cinema.modules.booking.business.PaymentStatus;
+import com.example.cinema.modules.booking.business.bookingSeat;
 import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatKind;
 import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatSnapshot;
 import com.example.cinema.modules.theater.business.ShowtimeModuleApi.ShowtimeSnapshot;
@@ -68,6 +71,10 @@ class BookingServiceTest {
         );
 
         assertNotNull(booking.getBookingId());
+        assertNotNull(booking.getBookingCode());
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        assertEquals(null, booking.getCancelledAt());
+        assertEquals(null, booking.getSeats().get(0).getReleasedAt());
         assertEquals(userId, booking.getUserId());
         assertEquals(showtimeId, booking.getShowtimeId());
         assertEquals(2, booking.getSeats().size());
@@ -210,6 +217,21 @@ class BookingServiceTest {
         assertThrows(com.example.cinema.modules.theater.business.ShowtimeHasBookingsException.class,
                 () -> guard.checkCancellationAllowed(showtimeId));
         bookingService.deleteBooking(booking);
+        assertDoesNotThrow(() -> guard.checkCancellationAllowed(showtimeId));
+
+        Booking cancelledBooking = new Booking(
+                UUID.randomUUID(),
+                "BK-CANCELLED001",
+                userId,
+                showtimeId,
+                List.of(new bookingSeat(standardSeatId, new BigDecimal("100000.00"), NOW)),
+                new BigDecimal("100000.00"),
+                NOW,
+                PaymentStatus.PENDING,
+                BookingStatus.CANCELLED,
+                NOW
+        );
+        bookingRepository.save(cancelledBooking);
         assertDoesNotThrow(() -> guard.checkCancellationAllowed(showtimeId));
     }
 

@@ -1,5 +1,6 @@
 package com.example.cinema.modules.booking.data;
 
+import com.example.cinema.modules.booking.business.BookingStatus;
 import com.example.cinema.modules.booking.business.PaymentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,6 +19,9 @@ class BookingEntity {
     @Id
     private UUID id;
 
+    @Column(name = "booking_code", nullable = false, unique = true, length = 20)
+    private String bookingCode;
+
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
@@ -34,22 +38,45 @@ class BookingEntity {
     @Column(name = "payment_status", nullable = false, length = 20)
     private PaymentStatus paymentStatus;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private BookingStatus status;
+
+    @Column(name = "cancelled_at")
+    private Instant cancelledAt;
+
     protected BookingEntity() {
     }
 
-    BookingEntity(UUID id, UUID userId, UUID showtimeId, BigDecimal totalAmount, Instant createdAt, PaymentStatus paymentStatus) {
+    BookingEntity(
+            UUID id,
+            String bookingCode,
+            UUID userId,
+            UUID showtimeId,
+            BigDecimal totalAmount,
+            Instant createdAt,
+            PaymentStatus paymentStatus,
+            BookingStatus status,
+            Instant cancelledAt
+    ) {
         this.id = id;
+        this.bookingCode = bookingCode;
         this.userId = userId;
         this.showtimeId = showtimeId;
         this.totalAmount = totalAmount;
         this.createdAt = createdAt;
         this.paymentStatus = paymentStatus;
+        this.status = status;
+        this.cancelledAt = cancelledAt;
     }
 
     UUID getId() { return id; }
+    String getBookingCode() { return bookingCode; }
     UUID getUserId() { return userId; }
     UUID getShowtimeId() { return showtimeId; }
     BigDecimal getTotalAmount() { return totalAmount; }
     Instant getCreatedAt() { return createdAt; }
     PaymentStatus getPaymentStatus() { return paymentStatus; }
+    BookingStatus getStatus() { return status; }
+    Instant getCancelledAt() { return cancelledAt; }
 }
