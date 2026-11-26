@@ -36,17 +36,6 @@ class BookingRepositoryAdapter implements BookingRepository {
 
     @Override
     public Booking save(Booking booking) {
-        BookingEntity bookingEntity = new BookingEntity(
-                booking.getBookingId(),
-                booking.getBookingCode(),
-                booking.getUserId(),
-                booking.getShowtimeId(),
-                booking.getTotalAmount(),
-                booking.getCreatedAt(),
-                booking.getPaymentStatus(),
-                booking.getStatus(),
-                booking.getCancelledAt());
-
         List<BookingSeatEntity> seatEntities = booking.getSeats().stream()
                 .map(seat -> new BookingSeatEntity(
                         UUID.randomUUID(),
@@ -58,7 +47,7 @@ class BookingRepositoryAdapter implements BookingRepository {
                 .toList();
 
         try {
-            bookingJpaRepository.save(bookingEntity);
+            bookingJpaRepository.save(toEntity(booking));
             bookingSeatJpaRepository.saveAll(seatEntities);
             bookingSeatJpaRepository.flush();
             return booking;
@@ -72,23 +61,17 @@ class BookingRepositoryAdapter implements BookingRepository {
 
     static boolean isActiveSeatConstraintViolation(Throwable failure) {
         for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-            if (cause instanceof ConstraintViolationException violation) {
-                String constraintName = violation.getConstraintName();
-                if (constraintName != null && matchesSeatConstraint(constraintName)) {
+            String candidate = cause instanceof ConstraintViolationException violation && violation.getConstraintName() != null
+                    ? violation.getConstraintName()
+                    : cause.getMessage();
+            if (candidate != null) {
+                String normalized = candidate.toLowerCase(Locale.ROOT);
+                if (normalized.contains(ACTIVE_SEAT_INDEX) || normalized.contains(LEGACY_SEAT_CONSTRAINT)) {
                     return true;
                 }
             }
-            String message = cause.getMessage();
-            if (message != null && matchesSeatConstraint(message)) {
-                return true;
-            }
         }
         return false;
-    }
-
-    private static boolean matchesSeatConstraint(String value) {
-        String normalized = value.toLowerCase(Locale.ROOT);
-        return normalized.contains(ACTIVE_SEAT_INDEX) || normalized.contains(LEGACY_SEAT_CONSTRAINT);
     }
 
     @Override
@@ -122,18 +105,22 @@ class BookingRepositoryAdapter implements BookingRepository {
     @Transactional
     public Booking cancel(Booking booking, Instant cancelledAt) {
         Booking cancelled = booking.cancel(cancelledAt);
-        bookingJpaRepository.save(new BookingEntity(
-                cancelled.getBookingId(),
-                cancelled.getBookingCode(),
-                cancelled.getUserId(),
-                cancelled.getShowtimeId(),
-                cancelled.getTotalAmount(),
-                cancelled.getCreatedAt(),
-                cancelled.getPaymentStatus(),
-                cancelled.getStatus(),
-                cancelled.getCancelledAt()));
+        bookingJpaRepository.save(toEntity(cancelled));
         bookingSeatJpaRepository.releaseSeatsByBookingId(cancelled.getBookingId(), cancelledAt);
         return cancelled;
+    }
+
+    private static BookingEntity toEntity(Booking booking) {
+        return new BookingEntity(
+                booking.getBookingId(),
+                booking.getBookingCode(),
+                booking.getUserId(),
+                booking.getShowtimeId(),
+                booking.getTotalAmount(),
+                booking.getCreatedAt(),
+                booking.getPaymentStatus(),
+                booking.getStatus(),
+                booking.getCancelledAt());
     }
 
     @Override
