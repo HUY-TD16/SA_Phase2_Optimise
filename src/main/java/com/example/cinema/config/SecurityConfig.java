@@ -60,6 +60,7 @@ public class SecurityConfig {
                 paths.matcher(HttpMethod.POST, "/api/v1/auth/login"),
                 paths.matcher(HttpMethod.GET, "/actuator/health/liveness"),
                 paths.matcher(HttpMethod.GET, "/actuator/health/readiness"),
+                paths.matcher(HttpMethod.GET, "/actuator/prometheus"),
                 paths.matcher(HttpMethod.GET, "/api/v1/movies"),
                 paths.matcher(HttpMethod.GET, "/api/v1/movies/*"),
                 paths.matcher(HttpMethod.GET, "/api/v1/showtimes"),
