@@ -124,4 +124,25 @@ public class Booking {
     public BookingStatus getStatus() { return status; }
 
     public Instant getCancelledAt() { return cancelledAt; }
+
+    public Booking cancel(Instant cancelledAt) {
+        List<bookingSeat> releasedSeats = this.seats.stream()
+                .map(seat -> new bookingSeat(
+                        seat.getSeatId(),
+                        seat.getPrice(),
+                        seat.getReleasedAt() != null ? seat.getReleasedAt() : cancelledAt))
+                .toList();
+        return new Booking(
+                this.bookingId,
+                this.bookingCode,
+                this.userId,
+                this.showtimeId,
+                releasedSeats,
+                this.totalAmount,
+                this.createdAt,
+                this.paymentStatus,
+                BookingStatus.CANCELLED,
+                cancelledAt
+        );
+    }
 }

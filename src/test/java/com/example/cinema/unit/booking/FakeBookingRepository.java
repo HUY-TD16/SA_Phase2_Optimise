@@ -47,6 +47,11 @@ class FakeBookingRepository implements BookingRepository {
     }
 
     @Override
+    public Optional<Booking> findByIdAndUserIdForUpdate(UUID bookingId, UUID userId) {
+        return findByIdAndUserId(bookingId, userId);
+    }
+
+    @Override
     public java.util.List<Booking> findAllByUserId(UUID userId) {
         return bookingsById.values().stream()
                 .filter(booking -> booking.getUserId().equals(userId))
@@ -56,6 +61,11 @@ class FakeBookingRepository implements BookingRepository {
     @Override
     public boolean existsByShowtimeIdAndSeatId(UUID showtimeId, UUID seatId) {
         return activeBookingBySeat.containsKey(new SeatKey(showtimeId, seatId));
+    }
+
+    @Override
+    public Booking cancel(Booking booking, java.time.Instant cancelledAt) {
+        return save(booking.cancel(cancelledAt));
     }
 
     @Override

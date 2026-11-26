@@ -4,6 +4,7 @@ import com.example.cinema.modules.booking.business.Booking;
 import com.example.cinema.modules.booking.business.BookingRepository;
 import com.example.cinema.modules.booking.business.BookingStatus;
 import com.example.cinema.modules.booking.business.bookingSeat;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,6 +64,11 @@ class BookingRepositoryAdapter implements BookingRepository {
     }
 
     @Override
+    public Optional<Booking> findByIdAndUserIdForUpdate(UUID bookingId, UUID userId) {
+        return bookingJpaRepository.findByIdAndUserIdForUpdate(bookingId, userId).map(this::toBooking);
+    }
+
+    @Override
     public List<Booking> findAllByUserId(UUID userId) {
         return bookingJpaRepository.findAllByUserIdOrderByCreatedAtDesc(userId).stream()
                 .map(this::toBooking)
@@ -72,6 +78,24 @@ class BookingRepositoryAdapter implements BookingRepository {
     @Override
     public boolean existsByShowtimeIdAndSeatId(UUID showtimeId, UUID seatId) {
         return bookingSeatJpaRepository.existsByShowtimeIdAndSeatIdAndReleasedAtIsNull(showtimeId, seatId);
+    }
+
+    @Override
+    @Transactional
+    public Booking cancel(Booking booking, Instant cancelledAt) {
+        Booking cancelled = booking.cancel(cancelledAt);
+        bookingJpaRepository.save(new BookingEntity(
+                cancelled.getBookingId(),
+                cancelled.getBookingCode(),
+                cancelled.getUserId(),
+                cancelled.getShowtimeId(),
+                cancelled.getTotalAmount(),
+                cancelled.getCreatedAt(),
+                cancelled.getPaymentStatus(),
+                cancelled.getStatus(),
+                cancelled.getCancelledAt()));
+        bookingSeatJpaRepository.releaseSeatsByBookingId(cancelled.getBookingId(), cancelledAt);
+        return cancelled;
     }
 
     @Override

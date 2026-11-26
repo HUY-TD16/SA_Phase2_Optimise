@@ -1,6 +1,7 @@
 package com.example.cinema.unit.booking;
 
 import com.example.cinema.modules.booking.business.Booking;
+import com.example.cinema.modules.booking.business.BookingCannotBeCancelledException;
 import com.example.cinema.modules.booking.business.BookingNotFoundException;
 import com.example.cinema.modules.booking.business.BookingService;
 import com.example.cinema.modules.booking.business.BookingStatus;
@@ -197,8 +198,56 @@ class BookingServiceTest {
         assertEquals(1, bookingRepository.getBookingCount());
 
         bookingService.cancelBooking(userId, booking.getBookingId());
-        assertEquals(0, bookingRepository.getBookingCount());
+        assertEquals(1, bookingRepository.getBookingCount());
+        Booking cancelled = bookingService.getBookingByUserId(userId, booking.getBookingId());
+        assertEquals(BookingStatus.CANCELLED, cancelled.getStatus());
+        assertEquals(NOW, cancelled.getCancelledAt());
+        assertEquals(NOW, cancelled.getSeats().get(0).getReleasedAt());
         assertDoesNotThrow(() -> bookingService.createBooking(UUID.randomUUID(), showtimeId, List.of(standardSeatId)));
+    }
+
+    @Test
+    void rejectsCancellingAlreadyCancelledBooking() {
+        Booking booking = bookingService.createBooking(userId, showtimeId, List.of(standardSeatId));
+        bookingService.cancelBooking(userId, booking.getBookingId());
+
+        assertThrows(BookingCannotBeCancelledException.class,
+                () -> bookingService.cancelBooking(userId, booking.getBookingId()));
+    }
+
+    @Test
+    void allowsCancellationAtExactlyThirtyMinutesBeforeShowtime() {
+        theaterApi.setShowtimeSnapshot(new ShowtimeSnapshot(
+                showtimeId,
+                auditoriumId,
+                NOW.plusSeconds(1_800),
+                new BigDecimal("100000.00"),
+                ShowtimeState.SCHEDULED,
+                List.of()
+        ));
+        Booking booking = bookingService.createBooking(userId, showtimeId, List.of(standardSeatId));
+
+        assertDoesNotThrow(() -> bookingService.cancelBooking(userId, booking.getBookingId()));
+        assertEquals(BookingStatus.CANCELLED,
+                bookingService.getBookingByUserId(userId, booking.getBookingId()).getStatus());
+    }
+
+    @Test
+    void rejectsCancellationLessThanThirtyMinutesBeforeShowtime() {
+        theaterApi.setShowtimeSnapshot(new ShowtimeSnapshot(
+                showtimeId,
+                auditoriumId,
+                NOW.plusSeconds(1_799),
+                new BigDecimal("100000.00"),
+                ShowtimeState.SCHEDULED,
+                List.of()
+        ));
+        Booking booking = bookingService.createBooking(userId, showtimeId, List.of(standardSeatId));
+
+        assertThrows(BookingCannotBeCancelledException.class,
+                () -> bookingService.cancelBooking(userId, booking.getBookingId()));
+        assertEquals(BookingStatus.CONFIRMED,
+                bookingService.getBookingByUserId(userId, booking.getBookingId()).getStatus());
     }
 
     @Test

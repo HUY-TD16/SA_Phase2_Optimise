@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class BookingService {
 
     private static final BigDecimal VIP_MULTIPLIER = new BigDecimal("1.20");
+    private static final Duration CANCELLATION_CUTOFF = Duration.ofMinutes(30);
 
     private final BookingRepository bookingRepository;
     private final ShowtimeModuleApi showtimeModuleApi;
@@ -80,8 +83,26 @@ public class BookingService {
 
     @Transactional
     public void cancelBooking(UUID userId, UUID bookingId) {
-        Booking booking = getBookingByUserId(userId, bookingId);
-        deleteBooking(booking);
+        if (userId == null || bookingId == null) {
+            throw new IllegalArgumentException("userId and bookingId must not be null");
+        }
+        Booking booking = bookingRepository.findByIdAndUserIdForUpdate(bookingId, userId)
+                .orElseThrow(() -> new BookingNotFoundException(bookingId));
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new BookingCannotBeCancelledException("Booking has already been cancelled");
+        }
+
+        ShowtimeSnapshot showtime = showtimeModuleApi.getShowtimeSnapshot(booking.getShowtimeId());
+        Instant now = clock.instant();
+        if (showtime == null
+                || showtime.startsAt() == null
+                || now.isAfter(showtime.startsAt().minus(CANCELLATION_CUTOFF))) {
+            throw new BookingCannotBeCancelledException(
+                    "Bookings can only be cancelled at least 30 minutes before showtime");
+        }
+
+        bookingRepository.cancel(booking, now);
     }
 
     public List<Booking> getBookingsByUserId(UUID userId) {
