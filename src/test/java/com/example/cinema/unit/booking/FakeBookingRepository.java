@@ -3,6 +3,7 @@ package com.example.cinema.unit.booking;
 import com.example.cinema.modules.booking.business.Booking;
 import com.example.cinema.modules.booking.business.BookingRepository;
 import com.example.cinema.modules.booking.business.BookingStatus;
+import com.example.cinema.modules.booking.business.SeatAlreadyBookedException;
 import com.example.cinema.modules.booking.business.bookingSeat;
 
 import java.util.HashMap;
@@ -18,6 +19,18 @@ class FakeBookingRepository implements BookingRepository {
 
     @Override
     public Booking save(Booking booking) {
+        if (booking.getStatus() == BookingStatus.CONFIRMED) {
+            for (bookingSeat seat : booking.getSeats()) {
+                if (seat.getReleasedAt() == null) {
+                    SeatKey key = new SeatKey(booking.getShowtimeId(), seat.getSeatId());
+                    UUID existingOwner = activeBookingBySeat.get(key);
+                    if (existingOwner != null && !existingOwner.equals(booking.getBookingId())) {
+                        throw new SeatAlreadyBookedException("Seat has already been booked");
+                    }
+                }
+            }
+        }
+
         Booking previousBooking = bookingsById.put(booking.getBookingId(), booking);
         if (previousBooking != null) {
             removeActiveSeats(previousBooking);

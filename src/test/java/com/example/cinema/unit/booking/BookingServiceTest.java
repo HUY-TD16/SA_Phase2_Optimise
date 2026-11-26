@@ -6,6 +6,7 @@ import com.example.cinema.modules.booking.business.BookingNotFoundException;
 import com.example.cinema.modules.booking.business.BookingService;
 import com.example.cinema.modules.booking.business.BookingStatus;
 import com.example.cinema.modules.booking.business.PaymentStatus;
+import com.example.cinema.modules.booking.business.SeatAlreadyBookedException;
 import com.example.cinema.modules.booking.business.bookingSeat;
 import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatKind;
 import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatSnapshot;
@@ -165,8 +166,23 @@ class BookingServiceTest {
     void rejectsSeatAlreadyBookedForSameShowtime() {
         bookingService.createBooking(userId, showtimeId, List.of(standardSeatId));
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(SeatAlreadyBookedException.class,
                 () -> bookingService.createBooking(UUID.randomUUID(), showtimeId, List.of(standardSeatId)));
+    }
+
+    @Test
+    void multiSeatBookingFailsAtomicallyWhenAnySeatIsAlreadyBooked() {
+        bookingService.createBooking(userId, showtimeId, List.of(vipSeatId));
+
+        assertThrows(SeatAlreadyBookedException.class,
+                () -> bookingService.createBooking(
+                        UUID.randomUUID(),
+                        showtimeId,
+                        List.of(standardSeatId, vipSeatId)
+                ));
+        assertEquals(1, bookingRepository.getBookingCount());
+        assertEquals(false, bookingRepository.existsByShowtimeIdAndSeatId(showtimeId, standardSeatId));
+        assertEquals(true, bookingRepository.existsByShowtimeIdAndSeatId(showtimeId, vipSeatId));
     }
 
     @Test
