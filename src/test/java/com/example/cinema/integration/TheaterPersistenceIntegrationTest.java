@@ -2,6 +2,8 @@ package com.example.cinema.integration;
 
 import com.example.cinema.modules.theater.business.AuditoriumStatus;
 import com.example.cinema.modules.theater.business.SeatType;
+import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatKind;
+import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatSnapshot;
 import com.example.cinema.modules.theater.business.ShowtimeStatus;
 import com.example.cinema.modules.theater.data.AuditoriumEntity;
 import com.example.cinema.modules.theater.data.AuditoriumJpaRepository;
@@ -71,5 +73,49 @@ class TheaterPersistenceIntegrationTest {
                 .extracting(SeatEntity::getId)
                 .containsExactly(seatId);
         assertThat(showtimeRepository.findById(showtimeId)).isPresent();
+    }
+
+    @Test
+    void filtersScheduledShowtimesInSqlAndProjectsLeanSeatSnapshots() {
+        UUID auditoriumId = UUID.randomUUID();
+        UUID movieId = UUID.randomUUID();
+        Instant dayStart = Instant.parse("2026-10-02T00:00:00Z");
+        Instant dayEnd = Instant.parse("2026-10-03T00:00:00Z");
+        auditoriumRepository.save(new AuditoriumEntity(
+                auditoriumId,
+                "R1 Projection Room " + auditoriumId,
+                AuditoriumStatus.ACTIVE,
+                null,
+                dayStart,
+                dayStart));
+
+        UUID seatA1 = UUID.randomUUID();
+        UUID seatB2 = UUID.randomUUID();
+        seatRepository.save(new SeatEntity(seatB2, auditoriumId, "B", 2, SeatType.VIP));
+        seatRepository.save(new SeatEntity(seatA1, auditoriumId, "A", 1, SeatType.STANDARD));
+
+        UUID scheduledId = UUID.randomUUID();
+        UUID cancelledId = UUID.randomUUID();
+        showtimeRepository.save(new ShowtimeEntity(
+                scheduledId, movieId, auditoriumId,
+                dayStart.plusSeconds(3600), dayStart.plusSeconds(11700),
+                new BigDecimal("90000.00"), ShowtimeStatus.SCHEDULED, dayStart, dayStart));
+        showtimeRepository.save(new ShowtimeEntity(
+                cancelledId, movieId, auditoriumId,
+                dayStart.plusSeconds(14400), dayStart.plusSeconds(22500),
+                new BigDecimal("90000.00"), ShowtimeStatus.CANCELLED, dayStart, dayStart));
+
+        assertThat(showtimeRepository.findAllByMovieIdAndStatusAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
+                movieId, ShowtimeStatus.SCHEDULED, dayStart, dayEnd))
+                .extracting(ShowtimeEntity::getId)
+                .containsExactly(scheduledId);
+
+        assertThat(showtimeRepository.findAuditoriumIdById(scheduledId))
+                .contains(auditoriumId);
+
+        assertThat(seatRepository.findSeatSnapshotsByAuditoriumId(auditoriumId))
+                .containsExactly(
+                        new SeatSnapshot(seatA1, auditoriumId, "A", 1, SeatKind.STANDARD),
+                        new SeatSnapshot(seatB2, auditoriumId, "B", 2, SeatKind.VIP));
     }
 }

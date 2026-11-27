@@ -42,6 +42,16 @@ public interface ShowtimeModuleApi {
     }
 
     /**
+     * Returns only the physical seat layout for a showtime without hydrating the full showtime snapshot.
+     *
+     * @param showtimeId showtime identifier
+     * @return an empty result when the showtime does not exist
+     */
+    default Optional<List<SeatSnapshot>> findShowtimeSeats(UUID showtimeId) {
+        return findShowtime(showtimeId).map(ShowtimeSnapshot::seats);
+    }
+
+    /**
      * Immutable showtime data required by booking rules and seat availability.
      */
     record ShowtimeSnapshot(

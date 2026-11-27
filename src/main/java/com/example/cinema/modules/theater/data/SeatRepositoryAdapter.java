@@ -2,6 +2,7 @@ package com.example.cinema.modules.theater.data;
 
 import com.example.cinema.modules.theater.business.Seat;
 import com.example.cinema.modules.theater.business.SeatRepository;
+import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatSnapshot;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,6 +30,11 @@ class SeatRepositoryAdapter implements SeatRepository {
         return seatRepository.findAllByAuditoriumIdOrderByRowLabelAscSeatNumberAsc(auditoriumId).stream()
                 .map(TheaterDataMapper::toBusiness)
                 .toList();
+    }
+
+    @Override
+    public List<SeatSnapshot> findSeatSnapshotsByAuditoriumId(UUID auditoriumId) {
+        return seatRepository.findSeatSnapshotsByAuditoriumId(auditoriumId);
     }
 
     @Override
