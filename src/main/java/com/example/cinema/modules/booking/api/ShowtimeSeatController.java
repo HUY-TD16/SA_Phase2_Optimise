@@ -1,15 +1,18 @@
 package com.example.cinema.modules.booking.api;
 
 import com.example.cinema.modules.booking.business.BookingService;
-import com.example.cinema.modules.booking.business.SeatAvailability;
+import com.example.cinema.modules.booking.business.SeatAvailabilitySummary;
 import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatKind;
+import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatSnapshot;
 import com.example.cinema.modules.theater.business.ShowtimeNotFoundException;
 import com.example.cinema.shared.api.ErrorResponse;
 import com.example.cinema.shared.api.RequestIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -32,7 +35,20 @@ public class ShowtimeSeatController {
     @Operation(summary = "Get physical seats and current availability for a showtime")
     @ApiResponse(responseCode = "404", description = "Showtime not found")
     public List<SeatResponse> list(@PathVariable UUID id) {
-        return bookingService.getSeatAvailability(id).stream().map(SeatResponse::from).toList();
+        SeatAvailabilitySummary summary = bookingService.getSeatAvailabilitySummary(id);
+        List<SeatSnapshot> seats = summary.seats();
+        Set<UUID> bookedSeatIds = summary.bookedSeatIds();
+        List<SeatResponse> responses = new ArrayList<>(seats.size());
+        for (int i = 0; i < seats.size(); i++) {
+            SeatSnapshot seat = seats.get(i);
+            responses.add(new SeatResponse(
+                    seat.seatId(),
+                    seat.rowLabel(),
+                    seat.seatNumber(),
+                    seat.type(),
+                    bookedSeatIds.contains(seat.seatId()) ? "BOOKED" : "AVAILABLE"));
+        }
+        return responses;
     }
 
     @ExceptionHandler(ShowtimeNotFoundException.class)
@@ -42,10 +58,5 @@ public class ShowtimeSeatController {
     }
 
     public record SeatResponse(UUID id, String row, int number, SeatKind type, String status) {
-        static SeatResponse from(SeatAvailability availability) {
-            var seat = availability.seat();
-            return new SeatResponse(seat.seatId(), seat.rowLabel(), seat.seatNumber(), seat.type(),
-                    availability.booked() ? "BOOKED" : "AVAILABLE");
-        }
     }
 }

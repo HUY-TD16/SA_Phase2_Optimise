@@ -221,7 +221,14 @@ class BookingServiceTest {
         assertEquals(standardSeatId, seats.get(0).seat().seatId());
         assertEquals(true, seats.get(0).booked());
         assertEquals(false, seats.get(1).booked());
+
+        var summary = bookingService.getSeatAvailabilitySummary(showtimeId);
+        assertEquals(2, summary.seats().size());
+        assertEquals(java.util.Set.of(standardSeatId), summary.bookedSeatIds());
+
         assertThrows(com.example.cinema.modules.theater.business.ShowtimeNotFoundException.class,
                 () -> bookingService.getSeatAvailability(UUID.randomUUID()));
+        assertThrows(com.example.cinema.modules.theater.business.ShowtimeNotFoundException.class,
+                () -> bookingService.getSeatAvailabilitySummary(UUID.randomUUID()));
     }
 }

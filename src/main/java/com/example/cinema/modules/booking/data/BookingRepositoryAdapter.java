@@ -5,6 +5,7 @@ import com.example.cinema.modules.booking.business.BookingRepository;
 import com.example.cinema.modules.booking.business.bookingSeat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
@@ -79,6 +80,11 @@ class BookingRepositoryAdapter implements BookingRepository {
     @Override
     public List<UUID> findBookedSeatIds(UUID showtimeId) {
         return bookingSeatJpaRepository.findBookedSeatIds(showtimeId);
+    }
+
+    @Override
+    public Set<UUID> findBookedSeatIdSet(UUID showtimeId) {
+        return bookingSeatJpaRepository.findBookedSeatIdSet(showtimeId);
     }
 
     private Booking toBooking(BookingEntity entity) {
