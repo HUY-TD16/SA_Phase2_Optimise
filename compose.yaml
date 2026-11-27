@@ -1,6 +1,12 @@
 services:
   db:
     image: postgres:17-alpine
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
     environment:
       POSTGRES_DB: cinema
       POSTGRES_USER: cinema
@@ -14,6 +20,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
+    mem_limit: 512m
 
   api:
     build: .
@@ -24,15 +31,37 @@ services:
       DB_URL: jdbc:postgresql://db:5432/cinema
       DB_USERNAME: cinema
       DB_PASSWORD: ${DB_PASSWORD:-cinema}
+      VIRTUAL_THREADS_ENABLED: ${VIRTUAL_THREADS_ENABLED:-true}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-30}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-10}
+      SERVER_COMPRESSION_ENABLED: ${SERVER_COMPRESSION_ENABLED:-true}
       JWT_SECRET: ${JWT_SECRET:-local-only-change-me-before-any-real-deployment-2026}
       JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-3600}
       DEMO_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-}
       DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health/readiness | grep -q UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     depends_on:
       db:
         condition: service_healthy
     ports:
       - "127.0.0.1:8080:8080"
+    mem_limit: 1024m
+    cpus: 2.0
+
+  prometheus:
+    image: prom/prometheus:v2.53.3
+    profiles: ["monitoring"]
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:
