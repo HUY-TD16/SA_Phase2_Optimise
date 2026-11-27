@@ -27,6 +27,7 @@ public class MovieService implements MovieModuleApi {
         return movieRepository.save(movie);
     }
 
+    @Transactional(readOnly = true)
     public Optional<Movie> getById(UUID movieId) {
         if(movieId == null) {
             return Optional.empty();
@@ -34,22 +35,22 @@ public class MovieService implements MovieModuleApi {
         else return movieRepository.findUndeletedById(movieId);
     }
 
+    @Transactional(readOnly = true)
     public MoviePage list(int page, int pageSize, MovieStatus status) {
         MovieValidation.validatePage(page, pageSize);
         return movieRepository.findUndeleted(page, pageSize, status);
     }
 
+    @Transactional(readOnly = true)
     public Optional<MovieForShowtime> findForShowtime(UUID movieId) {
-        Optional<Movie> movieOpt = movieRepository.findUndeletedById(movieId);
-        if(movieOpt.isEmpty()) {
-            return Optional.empty(); 
+        if (movieId == null) {
+            return Optional.empty();
         }
-        Movie movie = movieOpt.get();
-        MovieForShowtime movieForShowtime = new MovieForShowtime(movie.getId(), movie.getTitle(), movie.getDurationMinutes());
-        return Optional.of(movieForShowtime);
+        return movieRepository.findForShowtimeById(movieId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<MovieSnapshot> findMovieForScheduling(UUID movieId) {
         Optional<MovieForShowtime> movieOpt = findForShowtime(movieId);
         if (movieOpt.isEmpty()) {

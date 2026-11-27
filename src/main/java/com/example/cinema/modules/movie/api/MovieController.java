@@ -114,7 +114,7 @@ public class MovieController {
             @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
             @RequestParam(name = "status", required = false) MovieStatus status) {
         MoviePage moviePage = movieService.list(page, pageSize, status);
-        List<MovieResponse> movieResponses = new ArrayList<>();
+        List<MovieResponse> movieResponses = new ArrayList<>(moviePage.getItems().size());
         for (Movie movie : moviePage.getItems()) {
             MovieResponse movieResponse = toResponse(movie);
             movieResponses.add(movieResponse);
