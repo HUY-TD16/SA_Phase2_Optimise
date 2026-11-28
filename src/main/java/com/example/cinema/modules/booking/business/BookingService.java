@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -101,12 +102,23 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public List<SeatAvailability> getSeatAvailability(UUID showtimeId) {
-        ShowtimeSnapshot showtime = showtimeModuleApi.findShowtime(showtimeId)
+        SeatAvailabilitySummary summary = getSeatAvailabilitySummary(showtimeId);
+        List<SeatSnapshot> seats = summary.seats();
+        Set<UUID> bookedSeats = summary.bookedSeatIds();
+        List<SeatAvailability> availability = new ArrayList<>(seats.size());
+        for (int i = 0; i < seats.size(); i++) {
+            SeatSnapshot seat = seats.get(i);
+            availability.add(new SeatAvailability(seat, bookedSeats.contains(seat.seatId())));
+        }
+        return availability;
+    }
+
+    @Transactional(readOnly = true)
+    public SeatAvailabilitySummary getSeatAvailabilitySummary(UUID showtimeId) {
+        List<SeatSnapshot> seats = showtimeModuleApi.findShowtimeSeats(showtimeId)
                 .orElseThrow(() -> new ShowtimeNotFoundException(showtimeId));
-        var bookedSeats = new HashSet<>(bookingRepository.findBookedSeatIds(showtimeId));
-        return showtime.seats().stream()
-                .map(seat -> new SeatAvailability(seat, bookedSeats.contains(seat.seatId())))
-                .toList();
+        Set<UUID> bookedSeats = bookingRepository.findBookedSeatIdSet(showtimeId);
+        return new SeatAvailabilitySummary(seats, bookedSeats);
     }
 
     private BigDecimal getTotalAmount(List<bookingSeat> seats) {

@@ -11,10 +11,21 @@ public interface ShowtimeRepository {
 
     Optional<Showtime> findById(UUID showtimeId);
 
+    default Optional<UUID> findAuditoriumIdById(UUID showtimeId) {
+        return findById(showtimeId).map(Showtime::auditoriumId);
+    }
+
     Optional<Showtime> findByIdForUpdate(UUID showtimeId);
 
     /** Queries startsAt in the half-open interval [from, to), sorted ascending. */
     List<Showtime> findByMovieIdAndStartsAtBetween(UUID movieId, Instant from, Instant to);
+
+    /** Queries SCHEDULED showtimes with startsAt in the half-open interval [from, to), sorted ascending. */
+    default List<Showtime> findScheduledByMovieIdAndStartsAtBetween(UUID movieId, Instant from, Instant to) {
+        return findByMovieIdAndStartsAtBetween(movieId, from, to).stream()
+                .filter(showtime -> showtime.status() == ShowtimeStatus.SCHEDULED)
+                .toList();
+    }
 
     boolean existsOverlapping(UUID auditoriumId, Instant startsAt, Instant endsAt);
 

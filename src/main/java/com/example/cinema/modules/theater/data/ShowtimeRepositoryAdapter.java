@@ -40,6 +40,11 @@ class ShowtimeRepositoryAdapter implements ShowtimeRepository {
     }
 
     @Override
+    public Optional<UUID> findAuditoriumIdById(UUID showtimeId) {
+        return showtimeRepository.findAuditoriumIdById(showtimeId);
+    }
+
+    @Override
     public Optional<Showtime> findByIdForUpdate(UUID showtimeId) {
         return showtimeRepository.findByIdForUpdate(showtimeId).map(TheaterDataMapper::toBusiness);
     }
@@ -47,6 +52,16 @@ class ShowtimeRepositoryAdapter implements ShowtimeRepository {
     @Override
     public List<Showtime> findByMovieIdAndStartsAtBetween(UUID movieId, Instant from, Instant to) {
         return showtimeRepository.findAllByMovieIdAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(movieId, from, to).stream()
+                .map(TheaterDataMapper::toBusiness)
+                .toList();
+    }
+
+    @Override
+    public List<Showtime> findScheduledByMovieIdAndStartsAtBetween(UUID movieId, Instant from, Instant to) {
+        return showtimeRepository
+                .findAllByMovieIdAndStatusAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
+                        movieId, ShowtimeStatus.SCHEDULED, from, to)
+                .stream()
                 .map(TheaterDataMapper::toBusiness)
                 .toList();
     }

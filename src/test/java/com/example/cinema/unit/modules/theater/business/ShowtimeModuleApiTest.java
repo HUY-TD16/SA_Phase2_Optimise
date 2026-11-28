@@ -85,6 +85,25 @@ class ShowtimeModuleApiTest {
         }
     }
 
+    @Test
+    void findShowtimeSeatsUsesLeanAuditoriumAndSeatSnapshotQueries() {
+        var showtimes = org.mockito.Mockito.mock(com.example.cinema.modules.theater.business.ShowtimeRepository.class);
+        var seats = org.mockito.Mockito.mock(com.example.cinema.modules.theater.business.SeatRepository.class);
+        var service = new com.example.cinema.modules.theater.business.ShowtimeService(showtimes,
+                org.mockito.Mockito.mock(com.example.cinema.modules.theater.business.AuditoriumRepository.class), seats,
+                org.mockito.Mockito.mock(com.example.cinema.modules.movie.business.MovieModuleApi.class), java.time.Clock.systemUTC());
+        UUID showtimeId = UUID.randomUUID();
+        UUID roomId = UUID.randomUUID();
+        var seatSnapshot = new SeatSnapshot(UUID.randomUUID(), roomId, "A", 1, SeatKind.STANDARD);
+        org.mockito.Mockito.when(showtimes.findAuditoriumIdById(showtimeId)).thenReturn(java.util.Optional.of(roomId));
+        org.mockito.Mockito.when(seats.findSeatSnapshotsByAuditoriumId(roomId)).thenReturn(List.of(seatSnapshot));
+
+        assertThat(service.findShowtimeSeats(showtimeId)).contains(List.of(seatSnapshot));
+        assertThat(service.findShowtimeSeats(null)).isEmpty();
+        org.mockito.Mockito.verify(showtimes, org.mockito.Mockito.never()).findById(showtimeId);
+        org.mockito.Mockito.verify(seats, org.mockito.Mockito.never()).findByAuditoriumId(roomId);
+    }
+
     private static ShowtimeSnapshot showtime(List<SeatSnapshot> seats) {
         return new ShowtimeSnapshot(
                 UUID.randomUUID(),

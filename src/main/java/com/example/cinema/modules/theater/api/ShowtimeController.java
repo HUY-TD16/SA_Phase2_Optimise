@@ -2,12 +2,12 @@ package com.example.cinema.modules.theater.api;
 
 import com.example.cinema.modules.theater.business.Showtime;
 import com.example.cinema.modules.theater.business.ShowtimeService;
-import com.example.cinema.modules.theater.business.ShowtimeStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -39,10 +39,12 @@ public class ShowtimeController {
     ) {
         Instant from = date.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant through = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return showtimeService.findByMovieIdAndStartsAtBetween(movieId, from, through).stream()
-                .filter(showtime -> showtime.status() == ShowtimeStatus.SCHEDULED)
-                .map(ShowtimeController::toResponse)
-                .toList();
+        List<Showtime> showtimes = showtimeService.findScheduledByMovieIdAndStartsAtBetween(movieId, from, through);
+        List<ShowtimeResponse> responses = new ArrayList<>(showtimes.size());
+        for (int i = 0; i < showtimes.size(); i++) {
+            responses.add(toResponse(showtimes.get(i)));
+        }
+        return responses;
     }
 
     @GetMapping("/{id}")

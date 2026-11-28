@@ -67,6 +67,8 @@ class TheaterHttpTest {
         when(auditoriums.save(any())).thenAnswer(call -> call.getArgument(0));
         when(seats.saveAll(anyList())).thenAnswer(call -> call.getArgument(0));
         when(seats.findByAuditoriumId(any())).thenReturn(List.of(new Seat(SEAT, ROOM, "A", 1, SeatType.STANDARD)));
+        when(seats.findSeatSnapshotsByAuditoriumId(any())).thenReturn(List.of(
+                new ShowtimeModuleApi.SeatSnapshot(SEAT, ROOM, "A", 1, ShowtimeModuleApi.SeatKind.STANDARD)));
         when(movies.findMovieForScheduling(MOVIE)).thenReturn(Optional.of(new MovieModuleApi.MovieSnapshot(MOVIE, 120)));
         when(showtimes.save(any())).thenAnswer(call -> call.getArgument(0));
     }
@@ -142,12 +144,11 @@ class TheaterHttpTest {
         Showtime scheduled = showtime(ShowtimeStatus.SCHEDULED);
         Instant from = Instant.parse("2030-10-23T00:00:00Z");
         Instant to = Instant.parse("2030-10-24T00:00:00Z");
-        when(showtimes.findByMovieIdAndStartsAtBetween(MOVIE, from, to)).thenReturn(List.of(
-                scheduled, showtime(ShowtimeStatus.CANCELLED), showtime(ShowtimeStatus.FINISHED)));
+        when(showtimes.findScheduledByMovieIdAndStartsAtBetween(MOVIE, from, to)).thenReturn(List.of(scheduled));
         mvc.perform(get("/api/v1/showtimes").param("movieId", MOVIE.toString()).param("date", "2030-10-23"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(scheduled.id().toString()));
-        verify(showtimes).findByMovieIdAndStartsAtBetween(MOVIE, from, to);
+        verify(showtimes).findScheduledByMovieIdAndStartsAtBetween(MOVIE, from, to);
         Showtime cancelled = showtime(ShowtimeStatus.CANCELLED);
         when(showtimes.findById(cancelled.id())).thenReturn(Optional.of(cancelled));
         mvc.perform(get("/api/v1/showtimes/{id}", cancelled.id()))
@@ -157,8 +158,8 @@ class TheaterHttpTest {
     @Test
     void guestCanReadSeatAvailabilityAndUnknownShowtimesReturn404() throws Exception {
         Showtime showtime = showtime(ShowtimeStatus.SCHEDULED);
-        when(showtimes.findById(showtime.id())).thenReturn(Optional.of(showtime));
-        when(bookings.findBookedSeatIds(showtime.id())).thenReturn(List.of(SEAT));
+        when(showtimes.findAuditoriumIdById(showtime.id())).thenReturn(Optional.of(showtime.auditoriumId()));
+        when(bookings.findBookedSeatIdSet(showtime.id())).thenReturn(java.util.Set.of(SEAT));
         mvc.perform(get("/api/v1/showtimes/{id}/seats", showtime.id()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("BOOKED"));
         mvc.perform(get("/api/v1/showtimes/{id}/seats", UUID.randomUUID()))

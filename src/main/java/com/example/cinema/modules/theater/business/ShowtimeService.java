@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
@@ -86,13 +87,20 @@ public class ShowtimeService implements ShowtimeModuleApi {
         return showtimeRepository.save(showtime);
     }
 
+    @Transactional(readOnly = true)
     public Showtime findById(UUID showtimeId) {
         return showtimeRepository.findById(showtimeId)
                 .orElseThrow(() -> new ShowtimeNotFoundException(showtimeId));
     }
 
+    @Transactional(readOnly = true)
     public List<Showtime> findByMovieIdAndStartsAtBetween(UUID movieId, Instant from, Instant to) {
         return showtimeRepository.findByMovieIdAndStartsAtBetween(movieId, from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Showtime> findScheduledByMovieIdAndStartsAtBetween(UUID movieId, Instant from, Instant to) {
+        return showtimeRepository.findScheduledByMovieIdAndStartsAtBetween(movieId, from, to);
     }
 
     @Transactional
@@ -118,11 +126,22 @@ public class ShowtimeService implements ShowtimeModuleApi {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ShowtimeSnapshot getShowtimeSnapshot(UUID showtimeId) {
         if (showtimeId == null) {
             return null;
         }
         return showtimeRepository.findById(showtimeId).map(this::toSnapshot).orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<List<SeatSnapshot>> findShowtimeSeats(UUID showtimeId) {
+        if (showtimeId == null) {
+            return Optional.empty();
+        }
+        return showtimeRepository.findAuditoriumIdById(showtimeId)
+                .map(seatRepository::findSeatSnapshotsByAuditoriumId);
     }
 
     @Override

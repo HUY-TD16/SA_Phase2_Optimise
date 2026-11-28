@@ -1,6 +1,7 @@
 package com.example.cinema.modules.movie.data;
 
 import com.example.cinema.modules.movie.business.Movie;
+import com.example.cinema.modules.movie.business.MovieForShowtime;
 import com.example.cinema.modules.movie.business.MovieRepository;
 import com.example.cinema.modules.movie.business.MoviePage;
 import com.example.cinema.modules.movie.business.MovieStatus;
@@ -71,6 +72,11 @@ public class JpaMovieRepository implements MovieRepository {
     }
 
     @Override
+    public Optional<MovieForShowtime> findForShowtimeById(UUID id) {
+        return springDataMovieRepository.findForShowtimeByIdAndDeletedAtIsNull(id);
+    }
+
+    @Override
     public MoviePage findUndeleted(int page, int pageSize, MovieStatus status) {
         PageRequest pageRequest = PageRequest.of(page - 1, pageSize, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         Page<MovieEntity> movieEntities;
@@ -79,7 +85,7 @@ public class JpaMovieRepository implements MovieRepository {
         } else {
             movieEntities = springDataMovieRepository.findByStatusAndDeletedAtIsNull(status, pageRequest);
         }
-        ArrayList<Movie> movies = new ArrayList<>();
+        ArrayList<Movie> movies = new ArrayList<>(movieEntities.getNumberOfElements());
         for (MovieEntity movieEntity : movieEntities) {
             movies.add(toMovie(movieEntity));
         }
