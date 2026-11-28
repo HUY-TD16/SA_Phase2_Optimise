@@ -5,4 +5,4 @@ scrape_configs:
   - job_name: cinema-backend
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["api:8080"]
+      - targets: ["api:8080", "api-2:8080"]
