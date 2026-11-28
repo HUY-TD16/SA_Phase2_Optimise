@@ -141,4 +141,38 @@ class AuditoriumServiceTest {
                 .isInstanceOf(com.example.cinema.modules.theater.business.AuditoriumHasFutureShowtimesException.class);
         org.mockito.Mockito.verify(auditoriumRepository, org.mockito.Mockito.never()).save(any());
     }
+
+    @Test
+    void findActivePageBatchesSeatLookupAndValidatesPaginationBounds() {
+        var room1 = new Auditorium(java.util.UUID.randomUUID(), "Room 01",
+                com.example.cinema.modules.theater.business.AuditoriumStatus.ACTIVE, null, NOW, NOW);
+        var room2 = new Auditorium(java.util.UUID.randomUUID(), "Room 02",
+                com.example.cinema.modules.theater.business.AuditoriumStatus.ACTIVE, null, NOW, NOW);
+        var seat1 = new Seat(java.util.UUID.randomUUID(), room1.id(), "A", 1, SeatType.STANDARD);
+        var seat2 = new Seat(java.util.UUID.randomUUID(), room2.id(), "B", 1, SeatType.VIP);
+
+        when(auditoriumRepository.findActive(0, 10))
+                .thenReturn(new com.example.cinema.modules.theater.business.AuditoriumSlice(List.of(room1, room2), 2, 1));
+        when(seatRepository.findByAuditoriumIds(List.of(room1.id(), room2.id())))
+                .thenReturn(java.util.Map.of(room1.id(), List.of(seat1), room2.id(), List.of(seat2)));
+
+        var page = service.findActivePage(0, 10);
+
+        assertThat(page.page()).isEqualTo(0);
+        assertThat(page.size()).isEqualTo(10);
+        assertThat(page.totalElements()).isEqualTo(2);
+        assertThat(page.totalPages()).isEqualTo(1);
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.items().get(0).seats()).containsExactly(seat1);
+        assertThat(page.items().get(1).seats()).containsExactly(seat2);
+        verify(seatRepository).findByAuditoriumIds(List.of(room1.id(), room2.id()));
+        org.mockito.Mockito.verify(seatRepository, org.mockito.Mockito.never()).findByAuditoriumId(any());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.findActivePage(-1, 10))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.findActivePage(0, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.findActivePage(0, AuditoriumService.MAX_PAGE_SIZE + 1))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
