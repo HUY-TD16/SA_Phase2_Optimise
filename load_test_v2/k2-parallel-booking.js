@@ -2,16 +2,18 @@
 import exec from 'k6/execution';
 import { check } from 'k6';
 import { Counter } from 'k6/metrics';
-import { DURATION, apiRequest, buildSummary, contractEnvelopeOk, extractBookingId, loadFixtures, openArrivalOptions, parseJson, successfulBookings } from './lib/common.js';
+import { DURATION, apiRequest, buildStepStages, buildSummary, contractEnvelopeOk, extractBookingId, loadFixtures, openArrivalOptions, parseJson, successfulBookings } from './lib/common.js';
 
 const saved = loadFixtures();
 const poolExhausted = new Counter('fixture_seat_batches_exhausted');
 const rate = Number(__ENV.BOOKING_RATE || __ENV.RATE || 50);
+const stagePlan = buildStepStages(__ENV.BOOKING_STAGES || '');
 
 export const options = openArrivalOptions({
     rate,
-    preAllocatedVUs: 80,
-    maxVUs: 250,
+    stagePlan,
+    preAllocatedVUs: stagePlan ? 150 : 80,
+    maxVUs: stagePlan ? 400 : 250,
     thresholds: { fixture_seat_batches_exhausted: ['count==0'] },
 });
 
@@ -45,5 +47,5 @@ export function traffic() {
 }
 
 export function handleSummary(result) {
-    return buildSummary('k2-parallel-booking', result, { measureDurationSeconds: DURATION });
+    return buildSummary('k2-parallel-booking', result, { measureDurationSeconds: stagePlan ? stagePlan.totalDurationSec : DURATION });
 }

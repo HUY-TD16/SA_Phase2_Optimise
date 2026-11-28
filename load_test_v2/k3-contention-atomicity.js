@@ -94,8 +94,11 @@ export function lifecycleRules() {
 
 export function handleSummary(result) {
     const v = (k) => result.metrics[k]?.values || {};
+    const actualRate = v('measured_requests').rate || 0;
+    const reqs = v('measured_requests').count || 0;
+    const durSec = actualRate > 0 ? reqs / actualRate : (result.state?.testRunDurationMs ? result.state.testRunDurationMs / 1000 : 1);
     return buildSummary('k3-contention-atomicity', result, {
-        measureDurationSeconds: 1,
+        measureDurationSeconds: Number(durSec.toFixed(3)),
         singleSeatWinners: v('single_seat_winners').count || 0,
         overlapAtomicRollbackRate: v('partial_overlap_atomic_rollback_ok').rate ?? null,
         cancelUnder30mBlockedRate: v('cancel_under_30m_blocked_ok').rate ?? null,

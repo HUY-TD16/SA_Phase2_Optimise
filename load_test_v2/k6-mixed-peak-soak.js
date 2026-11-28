@@ -1,12 +1,18 @@
 // K6: Realistic Peak-Hour Mixed Open-Model & Soak Test (75% Read, 15% Booking, 5% History, 5% Cancel)
 import exec from 'k6/execution';
-import { DURATION, apiRequest, buildSummary, detectPaginationQuery, extractBookingId, loadFixtures, openArrivalOptions, successfulBookings } from './lib/common.js';
+import { DURATION, apiRequest, buildStepStages, buildSummary, detectPaginationQuery, extractBookingId, loadFixtures, openArrivalOptions, successfulBookings } from './lib/common.js';
 
 const saved = loadFixtures();
 const cancellable = [];
 let cancelCursor = 0;
+const stagePlan = buildStepStages(__ENV.MIXED_STAGES || '');
 
-export const options = openArrivalOptions({ rate: Number(__ENV.RATE || 350), preAllocatedVUs: 100, maxVUs: 350 });
+export const options = openArrivalOptions({
+    rate: Number(__ENV.RATE || 350),
+    stagePlan,
+    preAllocatedVUs: stagePlan ? 150 : 100,
+    maxVUs: stagePlan ? 450 : 350,
+});
 
 export function setup() {
     return { pageQuery: detectPaginationQuery('/api/v1/bookings', saved.loadUsers[0].token, 20) };
@@ -50,5 +56,5 @@ export function traffic(ctx) {
 }
 
 export function handleSummary(result) {
-    return buildSummary('k6-mixed-peak-soak', result, { measureDurationSeconds: DURATION });
+    return buildSummary('k6-mixed-peak-soak', result, { measureDurationSeconds: stagePlan ? stagePlan.totalDurationSec : DURATION });
 }

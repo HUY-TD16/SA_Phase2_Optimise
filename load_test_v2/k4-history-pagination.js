@@ -1,15 +1,21 @@
 // K4: N+1 Elimination & Pagination Scalability (100 vs 500 vs 2,000 Bookings + 30 Auditoriums)
 import exec from 'k6/execution';
 import { Trend } from 'k6/metrics';
-import { DURATION, apiRequest, buildSummary, detectPaginationQuery, loadFixtures, openArrivalOptions, unwrapData } from './lib/common.js';
+import { DURATION, apiRequest, buildStepStages, buildSummary, detectPaginationQuery, loadFixtures, openArrivalOptions, unwrapData } from './lib/common.js';
 
 const saved = loadFixtures();
 const t100 = new Trend('history_tier_100_latency', true);
 const t500 = new Trend('history_tier_500_latency', true);
 const t2000 = new Trend('history_tier_2000_latency', true);
 const t2000Bytes = new Trend('history_tier_2000_bytes', false);
+const stagePlan = buildStepStages(__ENV.HISTORY_STAGES || '');
 
-export const options = openArrivalOptions({ rate: Number(__ENV.RATE || 80), preAllocatedVUs: 50, maxVUs: 200 });
+export const options = openArrivalOptions({
+    rate: Number(__ENV.RATE || 80),
+    stagePlan,
+    preAllocatedVUs: stagePlan ? 120 : 50,
+    maxVUs: stagePlan ? 350 : 200,
+});
 
 export function setup() {
     const keys = Object.keys(saved.historyUsers).sort((a, b) => Number(a.slice(5)) - Number(b.slice(5)));
@@ -48,7 +54,7 @@ export function handleSummary(result) {
     const p500 = v('history_tier_500_latency')['p(95)'] || null;
     const p2000 = v('history_tier_2000_latency')['p(95)'] || null;
     return buildSummary('k4-history-pagination', result, {
-        measureDurationSeconds: DURATION,
+        measureDurationSeconds: stagePlan ? stagePlan.totalDurationSec : DURATION,
         historyLatencyP95Ms: { tier100: p100, tier500: p500, tier2000: p2000, ratio2000vs100: p100 && p2000 ? Number((p2000 / p100).toFixed(2)) : null },
         tier2000AvgBytes: v('history_tier_2000_bytes').avg ?? null,
     });

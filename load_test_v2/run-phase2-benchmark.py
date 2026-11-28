@@ -206,7 +206,8 @@ def main():
                 }
                 summary_path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
                 m = doc["metadata"]
-                print(f"[{name}] exit={exit_code} | rps={m['measuredThroughputRps']:.1f} | bookings/s={m['successfulBookingsPerSec']:.1f} | inv={inv.get('allInvariantsPassed') if inv else 'N/A'}")
+                peak_str = f" | peak_rps={m['peakStageRps']:.1f}" if m.get("stageCeiling") else ""
+                print(f"[{name}] exit={exit_code} | rps={m['measuredThroughputRps']:.1f}{peak_str} | bookings/s={m['successfulBookingsPerSec']:.1f} | inv={inv.get('allInvariantsPassed') if inv else 'N/A'}")
 
     print(f"[benchmark-v2] Saved results -> {run_root}")
 

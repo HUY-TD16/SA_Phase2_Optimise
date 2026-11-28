@@ -14,7 +14,7 @@ const OUTPUT = path.resolve(process.env.FIXTURES || 'load_test_v2/fixtures.local
 const QUICK = process.env.SEED_PROFILE === 'quick';
 const CFG = QUICK
     ? { movies: 200, deleted: 40, rooms: 8, users: 60, contenders: 30, batches: 400, seatsPerBatch: 4, waves: 15, tiers: [20, 100, 300] }
-    : { movies: 3000, deleted: 600, rooms: 30, users: 200, contenders: 100, batches: 3000, seatsPerBatch: 4, waves: 60, tiers: [100, 500, 2000] };
+    : { movies: 3000, deleted: 600, rooms: 30, users: 200, contenders: 100, batches: Number(process.env.PARALLEL_BATCHES || 6000), seatsPerBatch: 4, waves: 60, tiers: [100, 500, 2000] };
 
 const PASSWORD = process.env.LOAD_PASSWORD || 'load-test-123';
 const JWT_SECRET = process.env.JWT_SECRET || '';

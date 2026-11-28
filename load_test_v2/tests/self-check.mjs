@@ -38,21 +38,37 @@ try {
     fs.mkdirSync(aDir);
     fs.writeFileSync(path.join(bDir, 'environment.json'), JSON.stringify({ git: { commit: '21eec61000' }, hardware: { logicalCpuCount: 4 } }));
     fs.writeFileSync(path.join(aDir, 'environment.json'), JSON.stringify({ git: { commit: 'phase20000' }, hardware: { logicalCpuCount: 4 } }));
-    const mkRun = (rps, bps, p95, tup) => JSON.stringify({
-        metadata: { script: 'k2-parallel-booking', measuredRequests: rps * 60, measuredThroughputRps: rps, successfulBookingsPerSec: bps, latenciesMs: { bookingP95: p95 } },
+    const mkRun = (rps, bps, p95, tup, ceiling = null) => JSON.stringify({
+        metadata: {
+            script: 'k2-parallel-booking', measuredRequests: rps * 60, measuredThroughputRps: rps,
+            peakStageRps: ceiling ? ceiling.peakAchievedRps : rps, maxSlaRps: ceiling ? ceiling.maxSlaRps : null,
+            successfulBookingsPerSec: bps, peakStageBookingsPerSec: ceiling ? ceiling.peakBookingsPerSec : bps,
+            maxSlaBookingsPerSec: ceiling ? ceiling.maxSlaBookingsPerSec : null,
+            stageCeiling: ceiling, latenciesMs: { bookingP95: p95 },
+        },
         telemetry: { postgresDelta: { tupFetched: tup }, resources: { api: { cpuAvgPct: 45 }, database: { cpuAvgPct: 20 } } },
     });
     fs.writeFileSync(path.join(bDir, 'k2-run1.json'), mkRun(45, 45, 310, 900000));
-    fs.writeFileSync(path.join(aDir, 'k2-run1.json'), mkRun(210, 210, 9.5, 70000));
+    fs.writeFileSync(path.join(aDir, 'k2-run1.json'), mkRun(210, 210, 9.5, 70000, {
+        slaThresholdP95Ms: 500, peakAchievedRps: 285.5, peakBookingsPerSec: 285.5, maxSlaRps: 220.0, maxSlaBookingsPerSec: 220.0,
+        steps: [
+            { stage: 1, targetRps: 75, achievedRps: 75.0, achievedBookingsPerSec: 75.0, p95Ms: 12.4, slaOk: true },
+            { stage: 2, targetRps: 220, achievedRps: 220.0, achievedBookingsPerSec: 220.0, p95Ms: 68.1, slaOk: true },
+            { stage: 3, targetRps: 300, achievedRps: 285.5, achievedBookingsPerSec: 285.5, p95Ms: 640.0, slaOk: false },
+        ],
+    }));
 
     const outMd = path.join(tmp, 'report.md');
     const outCsv = path.join(tmp, 'summary.csv');
     execFileSync('python', ['-B', path.join(SUITE, 'compare-results.py'), '--before', bDir, '--after', aDir, '--output-md', outMd, '--output-csv', outCsv]);
     execFileSync('python', ['-B', '-c', "import ast, pathlib; [ast.parse(pathlib.Path(p).read_text('utf-8')) for p in ('load_test_v2/run-phase2-benchmark.py','load_test_v2/compare-results.py')]"]);
-    assert.ok(fs.readFileSync(outMd, 'utf8').includes('4.67x'));
+    const mdText = fs.readFileSync(outMd, 'utf8');
+    assert.ok(mdText.includes('4.67x'));
+    assert.ok(mdText.includes('285.50'));
+    assert.ok(mdText.includes('Step-Plateau Ceiling'));
 
     const nb = JSON.parse(fs.readFileSync(path.join(SUITE, 'cinema-kaggle-phase2.ipynb'), 'utf8'));
-    assert.equal(nb.cells.length, 8);
+    assert.equal(nb.cells.length, 9);
     console.log('ALL `load_test_v2` CHECKS PASSED!');
 } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

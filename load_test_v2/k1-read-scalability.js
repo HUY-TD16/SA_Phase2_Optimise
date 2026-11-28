@@ -2,19 +2,17 @@
 import exec from 'k6/execution';
 import { check } from 'k6';
 import { Rate } from 'k6/metrics';
-import { DURATION, apiRequest, buildSummary, loadFixtures, openArrivalOptions, unwrapData, unwrapList } from './lib/common.js';
+import { DURATION, apiRequest, buildStepStages, buildSummary, loadFixtures, openArrivalOptions, unwrapData, unwrapList } from './lib/common.js';
 
 const saved = loadFixtures();
 const cacheEvictOk = new Rate('cache_invalidation_verified');
-const stageTargets = (__ENV.READ_STAGES || '400,900,1600,2400').split(',').map(Number);
-const stepSec = Math.max(10, Math.floor(DURATION / stageTargets.length));
-const stages = __ENV.RATE ? null : stageTargets.map((target) => ({ target, duration: `${stepSec}s` }));
+const stagePlan = __ENV.RATE ? null : buildStepStages(__ENV.READ_STAGES || '400,900,1600,2400');
 
 export const options = openArrivalOptions({
-    rate: Number(__ENV.RATE || stageTargets[stageTargets.length - 1]),
-    stages,
+    rate: Number(__ENV.RATE || 2400),
+    stagePlan,
     preAllocatedVUs: 120,
-    maxVUs: 400,
+    maxVUs: 450,
 });
 
 const FILTERS = ['', '&status=NOW_SHOWING', '&status=COMING_SOON', '&status=NOW_SHOWING'];
@@ -54,5 +52,5 @@ export function teardown() {
 }
 
 export function handleSummary(result) {
-    return buildSummary('k1-read-scalability', result, { measureDurationSeconds: stages ? stepSec * stages.length : DURATION });
+    return buildSummary('k1-read-scalability', result, { measureDurationSeconds: stagePlan ? stagePlan.totalDurationSec : DURATION });
 }

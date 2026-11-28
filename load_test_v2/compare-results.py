@@ -52,7 +52,12 @@ def load_dir(path):
 
         agg[sc] = {
             "script": ms[0].get("script", sc), "rps": rps,
+            "peakRps": med([m.get("peakStageRps") or m.get("measuredThroughputRps") for m in ms]),
+            "maxSlaRps": med([m.get("maxSlaRps") for m in ms if m.get("maxSlaRps") is not None]),
             "bps": med([m.get("successfulBookingsPerSec") for m in ms]),
+            "peakBps": med([m.get("peakStageBookingsPerSec") or m.get("successfulBookingsPerSec") for m in ms]),
+            "maxSlaBps": med([m.get("maxSlaBookingsPerSec") for m in ms if m.get("maxSlaBookingsPerSec") is not None]),
+            "stageCeiling": next((m.get("stageCeiling") for m in ms if m.get("stageCeiling")), None),
             "readP95": med([l.get("readP95") for l in ls]),
             "bookP95": med([l.get("bookingP95") for l in ls]),
             "seatP95": med([l.get("seatMapP95") for l in ls]),
@@ -101,9 +106,13 @@ def main():
     ]
     for sc in scs:
         b, a = b_agg.get(sc, {}), a_agg.get(sc, {})
-        lines.append(f"| **{sc.upper()}** | Throughput (req/s) | {fmt(b.get('rps'))} | {fmt(a.get('rps'))} | {delta(b.get('rps'), a.get('rps'))} |")
+        lines.append(f"| **{sc.upper()}** | Throughput trung bình (req/s) | {fmt(b.get('rps'))} | {fmt(a.get('rps'))} | {delta(b.get('rps'), a.get('rps'))} |")
+        if a.get("stageCeiling"):
+            lines.append(f"| ↳ *Ceiling* | **Đỉnh Trần đạt được (`Peak RPS` / `SLA RPS`)** | {fmt(b.get('peakRps'))} | **{fmt(a.get('peakRps'))}** / `{fmt(a.get('maxSlaRps'))}` | {delta(b.get('peakRps'), a.get('peakRps'))} |")
         if (b.get("bps") or 0) > 0 or (a.get("bps") or 0) > 0:
             lines.append(f"| ↳ *Write* | **Đơn thành công (`201/s`)** | {fmt(b.get('bps'))} | {fmt(a.get('bps'))} | {delta(b.get('bps'), a.get('bps'))} |")
+            if a.get("stageCeiling") and (a.get("peakBps") or 0) > 0:
+                lines.append(f"| ↳ *Write Ceiling* | **Đỉnh Đơn thành công (`Peak 201/s` / `SLA 201/s`)** | {fmt(b.get('peakBps'))} | **{fmt(a.get('peakBps'))}** / `{fmt(a.get('maxSlaBps'))}` | {delta(b.get('peakBps'), a.get('peakBps'))} |")
         if b.get("readP95") or a.get("readP95"):
             lines.append(f"| ↳ *Read* | Read `p95` (ms) | {fmt(b.get('readP95'), ' ms')} | {fmt(a.get('readP95'), ' ms')} | {delta(b.get('readP95'), a.get('readP95'), True)} |")
         if b.get("bookP95") or a.get("bookP95"):
@@ -134,17 +143,33 @@ def main():
         f"| Độ trễ `p95` khách thật khi bị tấn công BCrypt DoS | {fmt(bk5.get('dosP95'), ' ms')} | **{fmt(ak5.get('dosP95'), ' ms')}** |",
     ]
 
+    ceiling_scs = [sc for sc in scs if (a_agg.get(sc) or {}).get("stageCeiling")]
+    if ceiling_scs:
+        lines += [
+            "", "## 5. Chi tiết Khảo sát Đỉnh Trần Theo Từng Bậc Tải (Step-Plateau Ceiling)",
+            "| Kịch bản | Bậc | Mục tiêu (`req/s`) | Đạt thực tế (`req/s`) | Đơn `201/s` | Độ trễ `p95` (ms) | Trạng thái SLA |",
+            "| :--- | :---: | ---: | ---: | ---: | ---: | :---: |",
+        ]
+        for sc in ceiling_scs:
+            c = a_agg[sc]["stageCeiling"]
+            for st in c.get("steps") or []:
+                status = "✅ Đạt SLA" if st.get("slaOk") else "⚠️ Quá tải / Bão hòa"
+                lines.append(
+                    f"| **{sc.upper()}** | Bậc {st['stage']} | {fmt(st['targetRps'], '', 0)} | **{fmt(st['achievedRps'])}** | "
+                    f"{fmt(st['achievedBookingsPerSec']) if st.get('achievedBookingsPerSec') else '—'} | {fmt(st.get('p95Ms'), ' ms')} | {status} |"
+                )
+
     md = "\n".join(lines) + "\n"
     out_md = pathlib.Path(args.output_md)
     out_md.parent.mkdir(parents=True, exist_ok=True)
     out_md.write_text(md, encoding="utf-8")
 
     with pathlib.Path(args.output_csv).open("w", newline="", encoding="utf-8") as fp:
-        w = csv.DictWriter(fp, fieldnames=("scenario", "before_rps", "after_rps", "before_bookings_s", "after_bookings_s", "before_read_p95", "after_read_p95", "before_book_p95", "after_book_p95", "before_tup_req", "after_tup_req", "before_eff", "after_eff"))
+        w = csv.DictWriter(fp, fieldnames=("scenario", "before_rps", "after_rps", "after_peak_rps", "after_max_sla_rps", "before_bookings_s", "after_bookings_s", "after_peak_bookings_s", "before_read_p95", "after_read_p95", "before_book_p95", "after_book_p95", "before_tup_req", "after_tup_req", "before_eff", "after_eff"))
         w.writeheader()
         for sc in scs:
             b, a = b_agg.get(sc, {}), a_agg.get(sc, {})
-            w.writerow({"scenario": sc, "before_rps": b.get("rps"), "after_rps": a.get("rps"), "before_bookings_s": b.get("bps"), "after_bookings_s": a.get("bps"), "before_read_p95": b.get("readP95"), "after_read_p95": a.get("readP95"), "before_book_p95": b.get("bookP95"), "after_book_p95": a.get("bookP95"), "before_tup_req": b.get("tupPerReq"), "after_tup_req": a.get("tupPerReq"), "before_eff": b.get("eff"), "after_eff": a.get("eff")})
+            w.writerow({"scenario": sc, "before_rps": b.get("rps"), "after_rps": a.get("rps"), "after_peak_rps": a.get("peakRps"), "after_max_sla_rps": a.get("maxSlaRps"), "before_bookings_s": b.get("bps"), "after_bookings_s": a.get("bps"), "after_peak_bookings_s": a.get("peakBps"), "before_read_p95": b.get("readP95"), "after_read_p95": a.get("readP95"), "before_book_p95": b.get("bookP95"), "after_book_p95": a.get("bookP95"), "before_tup_req": b.get("tupPerReq"), "after_tup_req": a.get("tupPerReq"), "before_eff": b.get("eff"), "after_eff": a.get("eff")})
 
     print(md)
 
