@@ -2,15 +2,21 @@ package com.example.cinema.modules.theater.business;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.springframework.transaction.annotation.Transactional;
 
 public class AuditoriumService {
+
+    public static final int DEFAULT_PAGE = 0;
+    public static final int DEFAULT_PAGE_SIZE = 20;
+    public static final int MAX_PAGE_SIZE = 50;
 
     private final AuditoriumRepository auditoriumRepository;
     private final SeatRepository seatRepository;
@@ -70,10 +76,40 @@ public class AuditoriumService {
         return saved;
     }
 
+    @Transactional(readOnly = true)
     public List<Auditorium> findActive() {
         return auditoriumRepository.findActive();
     }
 
+    @Transactional(readOnly = true)
+    public AuditoriumPage findActivePage(int page, int size) {
+        if (page < 0) {
+            throw new IllegalArgumentException("page must be greater than or equal to 0");
+        }
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new IllegalArgumentException("size must be between 1 and " + MAX_PAGE_SIZE);
+        }
+        AuditoriumSlice slice = auditoriumRepository.findActive(page, size);
+        List<Auditorium> auditoriums = slice.items();
+        if (auditoriums.isEmpty()) {
+            return new AuditoriumPage(List.of(), page, size, slice.totalElements(), slice.totalPages());
+        }
+        List<UUID> auditoriumIds = new ArrayList<>(auditoriums.size());
+        for (int i = 0; i < auditoriums.size(); i++) {
+            auditoriumIds.add(auditoriums.get(i).id());
+        }
+        Map<UUID, List<Seat>> seatsByAuditorium = seatRepository.findByAuditoriumIds(auditoriumIds);
+        List<AuditoriumWithSeats> items = new ArrayList<>(auditoriums.size());
+        for (int i = 0; i < auditoriums.size(); i++) {
+            Auditorium auditorium = auditoriums.get(i);
+            items.add(new AuditoriumWithSeats(
+                    auditorium,
+                    seatsByAuditorium.getOrDefault(auditorium.id(), List.of())));
+        }
+        return new AuditoriumPage(items, page, size, slice.totalElements(), slice.totalPages());
+    }
+
+    @Transactional(readOnly = true)
     public List<Seat> findSeats(UUID auditoriumId) {
         return seatRepository.findByAuditoriumId(auditoriumId);
     }

@@ -64,9 +64,12 @@ class TheaterHttpTest {
         var room = new Auditorium(ROOM, "Room", AuditoriumStatus.ACTIVE, null, NOW, NOW);
         when(auditoriums.findByIdForUpdate(ROOM)).thenReturn(Optional.of(room));
         when(auditoriums.findActive()).thenReturn(List.of(room));
+        when(auditoriums.findActive(0, 20)).thenReturn(new AuditoriumSlice(List.of(room), 1, 1));
         when(auditoriums.save(any())).thenAnswer(call -> call.getArgument(0));
         when(seats.saveAll(anyList())).thenAnswer(call -> call.getArgument(0));
         when(seats.findByAuditoriumId(any())).thenReturn(List.of(new Seat(SEAT, ROOM, "A", 1, SeatType.STANDARD)));
+        when(seats.findByAuditoriumIds(any())).thenReturn(java.util.Map.of(
+                ROOM, List.of(new Seat(SEAT, ROOM, "A", 1, SeatType.STANDARD))));
         when(seats.findSeatSnapshotsByAuditoriumId(any())).thenReturn(List.of(
                 new ShowtimeModuleApi.SeatSnapshot(SEAT, ROOM, "A", 1, ShowtimeModuleApi.SeatKind.STANDARD)));
         when(movies.findMovieForScheduling(MOVIE)).thenReturn(Optional.of(new MovieModuleApi.MovieSnapshot(MOVIE, 120)));
@@ -79,7 +82,18 @@ class TheaterHttpTest {
                         .contentType(MediaType.APPLICATION_JSON).content(roomRequest("Room")))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.capacity").value(1));
         mvc.perform(get("/api/v1/admin/auditoriums").with(user("admin").roles("ADMIN")))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].seats[0].row").value("A"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].seats[0].row").value("A"))
+                .andExpect(jsonPath("$.pagination.page").value(0))
+                .andExpect(jsonPath("$.pagination.size").value(20))
+                .andExpect(jsonPath("$.pagination.totalElements").value(1))
+                .andExpect(jsonPath("$.pagination.totalPages").value(1));
+        mvc.perform(get("/api/v1/admin/auditoriums").param("page", "-1").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        mvc.perform(get("/api/v1/admin/auditoriums").param("size", "51").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
         mvc.perform(delete("/api/v1/admin/auditoriums/{id}", ROOM).with(user("admin").roles("ADMIN")))
                 .andExpect(status().isNoContent()).andExpect(content().string(""));
         verify(auditoriums).save(argThat(room -> room.id().equals(ROOM)

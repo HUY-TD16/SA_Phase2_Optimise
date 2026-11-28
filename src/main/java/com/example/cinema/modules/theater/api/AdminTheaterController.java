@@ -1,16 +1,21 @@
 package com.example.cinema.modules.theater.api;
 
 import com.example.cinema.modules.theater.business.Auditorium;
+import com.example.cinema.modules.theater.business.AuditoriumPage;
 import com.example.cinema.modules.theater.business.AuditoriumService;
+import com.example.cinema.modules.theater.business.AuditoriumWithSeats;
 import com.example.cinema.modules.theater.business.CreateShowtimeCommand;
 import com.example.cinema.modules.theater.business.Seat;
 import com.example.cinema.modules.theater.business.Showtime;
 import com.example.cinema.modules.theater.business.ShowtimeService;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -22,6 +27,7 @@ import java.util.UUID;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -47,9 +53,26 @@ public class AdminTheaterController {
     }
 
     @GetMapping("/auditoriums")
-    @Operation(summary = "List active auditoriums and their seat layouts")
-    public List<AuditoriumResponse> listAuditoriums() {
-        return auditoriumService.findActive().stream().map(this::toResponse).toList();
+    @Operation(summary = "List active auditoriums and their seat layouts with pagination")
+    public AuditoriumListResponse listAuditoriums(
+            @Parameter(description = "Zero-based page index", schema = @Schema(minimum = "0", defaultValue = "0"))
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", schema = @Schema(minimum = "1", maximum = "50", defaultValue = "20"))
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        AuditoriumPage result = auditoriumService.findActivePage(page, size);
+        List<AuditoriumResponse> data = new ArrayList<>(result.items().size());
+        for (int i = 0; i < result.items().size(); i++) {
+            AuditoriumWithSeats item = result.items().get(i);
+            data.add(toResponse(item.auditorium(), item.seats()));
+        }
+        return new AuditoriumListResponse(
+                data,
+                new AuditoriumListResponse.PaginationMeta(
+                        result.page(),
+                        result.size(),
+                        result.totalElements(),
+                        result.totalPages()));
     }
 
     @PostMapping("/auditoriums")
@@ -84,11 +107,16 @@ public class AdminTheaterController {
     }
 
     private AuditoriumResponse toResponse(Auditorium auditorium) {
-        List<Seat> seats = auditoriumService.findSeats(auditorium.id());
-        List<AuditoriumResponse.SeatResponse> seatResponses = seats.stream()
-                .map(seat -> new AuditoriumResponse.SeatResponse(
-                        seat.id(), seat.rowLabel(), seat.seatNumber(), seat.type()))
-                .toList();
+        return toResponse(auditorium, auditoriumService.findSeats(auditorium.id()));
+    }
+
+    private AuditoriumResponse toResponse(Auditorium auditorium, List<Seat> seats) {
+        List<AuditoriumResponse.SeatResponse> seatResponses = new ArrayList<>(seats.size());
+        for (int i = 0; i < seats.size(); i++) {
+            Seat seat = seats.get(i);
+            seatResponses.add(new AuditoriumResponse.SeatResponse(
+                    seat.id(), seat.rowLabel(), seat.seatNumber(), seat.type()));
+        }
         return new AuditoriumResponse(
                 auditorium.id(),
                 auditorium.name(),

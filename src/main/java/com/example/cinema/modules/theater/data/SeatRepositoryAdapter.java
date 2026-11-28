@@ -3,7 +3,11 @@ package com.example.cinema.modules.theater.data;
 import com.example.cinema.modules.theater.business.Seat;
 import com.example.cinema.modules.theater.business.SeatRepository;
 import com.example.cinema.modules.theater.business.ShowtimeModuleApi.SeatSnapshot;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
@@ -30,6 +34,20 @@ class SeatRepositoryAdapter implements SeatRepository {
         return seatRepository.findAllByAuditoriumIdOrderByRowLabelAscSeatNumberAsc(auditoriumId).stream()
                 .map(TheaterDataMapper::toBusiness)
                 .toList();
+    }
+
+    @Override
+    public Map<UUID, List<Seat>> findByAuditoriumIds(Collection<UUID> auditoriumIds) {
+        if (auditoriumIds == null || auditoriumIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Seat> allSeats = seatRepository.findAllSeatsByAuditoriumIdIn(auditoriumIds);
+        Map<UUID, List<Seat>> grouped = new LinkedHashMap<>();
+        for (int i = 0; i < allSeats.size(); i++) {
+            Seat seat = allSeats.get(i);
+            grouped.computeIfAbsent(seat.auditoriumId(), key -> new ArrayList<>()).add(seat);
+        }
+        return grouped;
     }
 
     @Override

@@ -108,9 +108,13 @@ class TheaterApiIntegrationTest {
         UUID auditoriumId = UUID.fromString(objectMapper.readTree(auditoriumResult.getResponse().getContentAsString())
                 .path("id").asText());
         mockMvc.perform(get("/api/v1/admin/auditoriums")
+                        .param("page", "0")
+                        .param("size", "20")
                         .with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].id").value(org.hamcrest.Matchers.hasItem(auditoriumId.toString())));
+                .andExpect(jsonPath("$.data[*].id").value(org.hamcrest.Matchers.hasItem(auditoriumId.toString())))
+                .andExpect(jsonPath("$.pagination.page").value(0))
+                .andExpect(jsonPath("$.pagination.size").value(20));
 
         Instant startsAt = Instant.now().plus(Duration.ofHours(2)).truncatedTo(ChronoUnit.SECONDS);
         MvcResult showtimeResult = mockMvc.perform(post("/api/v1/admin/showtimes")
